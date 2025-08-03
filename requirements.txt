@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+locust
+librosa
+scikit-learn
+numpy
+joblib
+pydantic
+python-multipart
+resampy
+sqlalchemy
+uvicorn[ssl]
+psycopg2-binary
+python-dotenv
+pandas

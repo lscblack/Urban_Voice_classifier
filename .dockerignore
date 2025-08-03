@@ -1,0 +1,28 @@
+# Ignore unnecessary files and directories
+__pycache__
+*.pyc
+*.pyo
+*.git
+*.gitignore
+*.md
+tests/
+docker-compose.yml
+
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Ignore data and audio files
+/urbansound_classifier/data/
+*.wav
+*.mp3
+*.flac
+*.ogg
+*.m4a
+*.DS_Store
+simulation/
+notebook/
+client/
+data/
+# Allow the .env file (this will make sure it is NOT ignored)
+!.env

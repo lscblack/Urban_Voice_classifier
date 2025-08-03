@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+*$py.class
+
+/urbansound_classifier/data/
+# Audio files
+*.wav
+*.mp3
+*.flac
+*.ogg
+*.m4a
+*.DS_Store
+*.env
+setup.sh
