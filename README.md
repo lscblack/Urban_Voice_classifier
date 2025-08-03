@@ -187,9 +187,8 @@ Fully integrated via psycopg2 with automatic logging.
 **Lscblack (Loue Sauveur Christian)**
 [github.com/lscblack](https://github.com/lscblack)
 ## Frontend Screen Shots
-<img width="1919" height="928" alt="image" src="https://github.com/user-attachments/assets/07534919-f098-40bd-9196-27699a2d904b" />
-<img width="1919" height="928" alt="image" src="https://github.com/user-attachments/assets/d3283f26-92b3-42ba-a4a2-80dc348e74cc" />
-<img width="1919" height="928" alt="image" src="https://github.com/user-attachments/assets/050248b5-09f0-4699-88a5-6bdcf043aff2" />
+<img width="1919" height="928" alt="image" src="https://github.com/user-attachments/assets/a89422bc-8711-4ea6-9b81-77c6a527e02b" />
 
-
-
+<img width="1919" height="928" alt="image" src="https://github.com/user-attachments/assets/7629e0a1-2100-4aae-b217-9b2834861b6c" />
+<img width="1919" height="928" alt="image" src="https://github.com/user-attachments/assets/15cadb45-d078-4ad8-b032-de28f26a16c1" />
+<img width="1919" height="928" alt="image" src="https://github.com/user-attachments/assets/71faa405-68bf-4ada-8cf9-3ddccae8d922" />
