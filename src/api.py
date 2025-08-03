@@ -124,6 +124,7 @@ def init_db():
 # Initialize database tables on startup
 init_db()
 
+
 # Cell 4: Extract Features (MFCCs)
 def extract_features(file_path):
     audio, sample_rate = librosa.load(file_path, res_type='kaiser_fast')
