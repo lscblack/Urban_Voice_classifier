@@ -672,17 +672,15 @@ async def get_training_history(limit: int = 10):
                    is_retraining, samples_added, notes
             FROM model_evaluations
             ORDER BY timestamp DESC
-            LIMIT %s
             """
         else:
             query = """
             SELECT id, model_name, timestamp, accuracy, precision, recall, f1_score, notes
             FROM model_evaluations
             ORDER BY timestamp DESC
-            LIMIT %s
             """
         
-        cursor.execute(query, (limit,))
+        cursor.execute(query, )
         
         history = []
         for row in cursor.fetchall():
@@ -728,8 +726,7 @@ async def get_prediction_history(limit: int = 10):
         SELECT id, timestamp, file_name, true_label, predicted_label, confidence, is_correct
         FROM prediction_history
         ORDER BY timestamp DESC
-        LIMIT %s
-        """, (limit,))
+        """ )
         
         history = []
         for row in cursor.fetchall():

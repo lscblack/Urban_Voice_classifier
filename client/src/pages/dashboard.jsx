@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import JSZip from 'jszip';
-import { FileArchive } from 'lucide-react';
+import { FileArchive, Train } from 'lucide-react';
 import {
   Upload,
   Brain,
@@ -25,6 +25,8 @@ import {
   Plus,
   Minus
 } from 'lucide-react';
+import { PredictionGraphs } from './Graphs';
+import { TrainingHistoryChart } from './TrainGraph';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -796,7 +798,10 @@ const Dashboard = () => {
                 <History className="text-orange-600" size={24} />
                 <h2 className="text-2xl font-bold text-gray-900">History</h2>
               </div>
-
+              <h2 className="text-lg font-medium text-gray-800 mb-3">Prediction analytics</h2>
+              <PredictionGraphs predictionData={predictionHistory} />
+              <h2 className="text-lg font-medium text-gray-800 mb-3">Training analytics</h2>
+               <TrainingHistoryChart training_history={trainingHistory} />
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Training History */}
                 <div>
