@@ -1,5 +1,12 @@
 [[redirects]]
   from = "/api/*"
-  to = "http://13.60.72.39:8000/:splat"
+  to = "http://13.60.72.39:8000/api/:splat"
   status = 200
-  force = false
+  force = true
+  headers = { X-Frame-Options = "DENY" }
+
+[[redirects]]
+  from = "http://*"
+  to = "https://:splat"
+  status = 301
+  force = true
