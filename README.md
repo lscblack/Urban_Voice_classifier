@@ -74,6 +74,9 @@ link to [dataset](https://urbansounddataset.weebly.com/download-urbansound8k.htm
 📡 **Live URL** [http://172.31.17.16:8000/docs](http://172.31.17.16:8000/docs)
 *(Hosted On AWS EC2)*
 
+## 🌐 Docker Image URL
+📡 **Live URL** [Docker Hub](https://hub.docker.com/r/lscblack/urbansound-api)
+
 ## 🌐 Deployed UI URL (Frontend)
 📡 **Live URL:** [https://soundclassifier-lscblack.netlify.app](https://soundclassifier-lscblack.netlify.app)
 *(hosted on netlify)*
