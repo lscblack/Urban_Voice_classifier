@@ -65,8 +65,7 @@ link to [dataset](https://urbansounddataset.weebly.com/download-urbansound8k.htm
 
 ## 🎥 Video Demo
 
-📺 **YouTube Link:** [https://youtu.be/YOUR\_DEMO\_LINK](https://youtu.be/YOUR_DEMO_LINK)
-
+📺 **YouTube Link:** [youtube demo](https://youtu.be/toVwO8nk5ZU)
 ---
 
 ## 🌐 Deployed API URL (Backend)
