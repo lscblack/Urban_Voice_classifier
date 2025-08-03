@@ -1,5 +1,5 @@
 [[redirects]]
-  from = "/api/*"
-  to = "http://13.60.72.39:8000/api/:splat"
+  from = "/*"
+  to = "https://13.60.72.39:8000/:splat"
   status = 200
-  headers = { "Access-Control-Allow-Origin" = "https://soundclassifier-lscblack.netlify.app/" }
+  headers = { Access-Control-Allow-Origin = "https://soundclassifier-lscblack.netlify.app" }
