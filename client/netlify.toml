@@ -2,11 +2,4 @@
   from = "/api/*"
   to = "http://13.60.72.39:8000/api/:splat"
   status = 200
-  force = true
-  headers = { X-Frame-Options = "DENY" }
-
-[[redirects]]
-  from = "http://*"
-  to = "https://:splat"
-  status = 301
-  force = true
+  headers = { "Access-Control-Allow-Origin" = "https://soundclassifier-lscblack.netlify.app/" }
