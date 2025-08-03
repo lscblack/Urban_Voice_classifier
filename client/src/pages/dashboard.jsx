@@ -79,7 +79,7 @@ const Dashboard = () => {
 
   const fetchTrainingHistory = async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/training_history?limit=20`);
+      const response = await axios.get(`${API_BASE_URL}/training_history?limit=40`);
       setTrainingHistory(response.data.training_history);
     } catch (error) {
       console.error('Error fetching training history:', error);
@@ -88,7 +88,7 @@ const Dashboard = () => {
 
   const fetchPredictionHistory = async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/prediction_history?limit=20`);
+      const response = await axios.get(`${API_BASE_URL}/prediction_history?limit=40`);
       setPredictionHistory(response.data.prediction_history);
     } catch (error) {
       console.error('Error fetching prediction history:', error);
@@ -243,29 +243,6 @@ const Dashboard = () => {
     setRecordingDuration(0);
   };
 
-  const addRetrainFile = () => {
-    const newFile = {
-      id: Date.now(),
-      file: null,
-      label: ''
-    };
-    setRetrainFiles([...retrainFiles, newFile]);
-  };
-
-  const removeRetrainFile = (id) => {
-    setRetrainFiles(retrainFiles.filter(file => file.id !== id));
-  };
-
-  const updateRetrainFile = (id, field, value) => {
-    setRetrainFiles(retrainFiles.map(file =>
-      file.id === id ? { ...file, [field]: value } : file
-    ));
-  };
-
-  const canRetrain = () => {
-    const validFiles = retrainFiles.filter(file => file.file && file.label);
-    return validFiles.length >= 10 && validFiles.length % 10 === 0;
-  };
 
   const handlePredict = async () => {
     if (!predictFile) return;
