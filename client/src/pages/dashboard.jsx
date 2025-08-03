@@ -77,7 +77,7 @@ const Dashboard = () => {
 
   const fetchTrainingHistory = async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/training_history?limit=5`);
+      const response = await axios.get(`${API_BASE_URL}/training_history?limit=20`);
       setTrainingHistory(response.data.training_history);
     } catch (error) {
       console.error('Error fetching training history:', error);
@@ -86,71 +86,85 @@ const Dashboard = () => {
 
   const fetchPredictionHistory = async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/prediction_history?limit=10`);
+      const response = await axios.get(`${API_BASE_URL}/prediction_history?limit=20`);
       setPredictionHistory(response.data.prediction_history);
     } catch (error) {
       console.error('Error fetching prediction history:', error);
     }
   };
+const startRecording = async () => {
+  try {
+    // Stop any existing recording first
+    if (mediaRecorderRef.current?.state === 'recording') {
+      mediaRecorderRef.current.stop();
+    }
 
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          sampleRate: 16000,    // Set to your model's required sample rate
-          channelCount: 1,      // Mono audio
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false
-        }
-      });
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        sampleRate: 16000,    // Set to your model's required sample rate
+        channelCount: 1,      // Mono audio
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: false
+      }
+    });
 
-      mediaRecorderRef.current = new MediaRecorder(stream);
-      audioChunksRef.current = [];
+    mediaRecorderRef.current = new MediaRecorder(stream);
+    audioChunksRef.current = [];
 
-      mediaRecorderRef.current.ondataavailable = (event) => {
+    mediaRecorderRef.current.ondataavailable = (event) => {
+      if (event.data.size > 0) {
         audioChunksRef.current.push(event.data);
+      }
+    };
+
+    mediaRecorderRef.current.onstop = () => {
+      const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+
+      // Convert to proper WAV format
+      const reader = new FileReader();
+      reader.onload = () => {
+        const arrayBuffer = reader.result;
+        const wavBlob = encodeWAV(arrayBuffer, 16000, 1);
+        const audioFile = new File([wavBlob], `recording_${Date.now()}.wav`, {
+          type: 'audio/wav'
+        });
+        setRecordedAudio(audioFile);
+        setPredictFile(audioFile);
       };
-
-      mediaRecorderRef.current.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' }); // Note: changed from audio/wav
-
-        // Convert to proper WAV format
-        const reader = new FileReader();
-        reader.onload = () => {
-          const arrayBuffer = reader.result;
-          const wavBlob = encodeWAV(arrayBuffer, 16000, 1);
-          const audioFile = new File([wavBlob], `recording_${Date.now()}.wav`, {
-            type: 'audio/wav'
-          });
-          setRecordedAudio(audioFile);
-          setPredictFile(audioFile);
-        };
-        reader.readAsArrayBuffer(audioBlob);
-
+      reader.onerror = () => {
+        console.error('FileReader error');
         stream.getTracks().forEach(track => track.stop());
       };
+      reader.readAsArrayBuffer(audioBlob);
 
-      mediaRecorderRef.current.start();
-      setIsRecording(true);
-      setRecordingDuration(0);
+      stream.getTracks().forEach(track => track.stop());
+    };
 
-      recordingIntervalRef.current = setInterval(() => {
-        setRecordingDuration(prev => prev + 1);
-      }, 1000);
-    } catch (error) {
-      console.error('Error starting recording:', error);
-      alert('Error accessing microphone. Please check permissions.');
-    }
-  };
+    mediaRecorderRef.current.start(100); // Collect data every 100ms
+    setIsRecording(true);
+    setRecordingDuration(0);
 
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
+    recordingIntervalRef.current = setInterval(() => {
+      setRecordingDuration(prev => prev + 1);
+    }, 1000);
+  } catch (error) {
+    console.error('Error starting recording:', error);
+    alert('Error accessing microphone. Please check permissions.');
+    setIsRecording(false);
+    clearInterval(recordingIntervalRef.current);
+  }
+};
+
+const stopRecording = () => {
+  if (mediaRecorderRef.current && isRecording) {
+    mediaRecorderRef.current.stop();
+    setIsRecording(false);
+    if (recordingIntervalRef.current) {
       clearInterval(recordingIntervalRef.current);
     }
-  };
+  }
+};
 
   const clearRecording = () => {
     setRecordedAudio(null);
