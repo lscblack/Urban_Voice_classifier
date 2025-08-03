@@ -441,6 +441,7 @@ async def retrain(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Retraining failed: {str(e)}")
+
 # ----------- METRICS ENDPOINT -----------
 @app.get("/metrics")
 def metrics():

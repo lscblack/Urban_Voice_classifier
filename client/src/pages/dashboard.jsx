@@ -289,37 +289,56 @@ const Dashboard = () => {
       setUploadProgress(0);
     }
   };
-
   const handleRetrain = async () => {
     const validFiles = retrainFiles.filter(file => file.file && file.label);
     if (!canRetrain()) return;
 
+    // Validate minimum files requirement (matching your backend validation)
+    if (validFiles.length < 10 || validFiles.length % 10 !== 0) {
+      alert("Minimum 10 files required and must be in multiples of 10");
+      return;
+    }
+
     setLoading(true);
 
     try {
-      // Send files in batches or individually - depending on your API design
-      for (const fileData of validFiles) {
-        const formData = new FormData();
-        formData.append('file', fileData.file);
-        formData.append('label', fileData.label);
+      const formData = new FormData();
 
-        await axios.post(`${API_BASE_URL}/retrain`, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
-      }
+      // Append all files
+      validFiles.forEach((fileData) => {
+        formData.append('files', fileData.file);
+      });
 
-      alert(`Model retrained successfully with ${validFiles.length} files!`);
+      // Append all labels
+      validFiles.forEach((fileData) => {
+        formData.append('labels', fileData.label);
+      });
+
+      // Append test_size (using your default of 0.2)
+      formData.append('test_size', '0.2');
+
+      const response = await axios.post(`${API_BASE_URL}/retrain`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      alert(`Model retrained successfully with ${validFiles.length} files!\n` +
+        `New accuracy: ${response.data.new_model_performance.accuracy.toFixed(2)}`);
+
       setRetrainFiles([]);
       fetchTrainingHistory();
       fetchModelInfo();
     } catch (error) {
       console.error('Retrain error:', error);
-      alert('Error during retraining. Please try again.');
+      if (error.response) {
+        // Handle backend validation errors
+        alert(`Error: ${error.response.data.detail}`);
+      } else {
+        alert('Error during retraining. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
   };
-
   const handleLogPrediction = async () => {
     if (!logFile || !logLabel) return;
 
