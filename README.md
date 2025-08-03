@@ -125,6 +125,7 @@ Navigate to [http://localhost:8089](http://localhost:8089)
 
 <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/5cb61207-4d17-480e-ae3b-33ce8268598c" />
 
+<img width="1919" height="928" alt="image" src="https://github.com/user-attachments/assets/17d26b6d-ed5d-4e1e-9baa-99444ce98405" />
 
 
 ### Frontend Setup Instructions
