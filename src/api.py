@@ -81,6 +81,14 @@ def init_db():
         ) THEN
             ALTER TABLE model_evaluations ADD COLUMN is_retraining BOOLEAN DEFAULT FALSE;
         END IF;
+        -- Add samples_added if it doesn't exist
+        IF NOT EXISTS (
+            SELECT 1 
+            FROM information_schema.columns 
+            WHERE table_name='model_evaluations' AND column_name='samples_added'
+        ) THEN
+            ALTER TABLE model_evaluations ADD COLUMN samples_added INTEGER DEFAULT 0;
+        END IF;
     END
     $$;
     """)
@@ -190,6 +198,7 @@ def extract_features(file_path: str) -> np.ndarray:
 
 def save_model_evaluation(metrics: dict, is_retraining: bool = False, samples_added: int = 0, notes: str = ""):
     """Save model evaluation metrics to database"""
+    conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -213,12 +222,19 @@ def save_model_evaluation(metrics: dict, is_retraining: bool = False, samples_ad
         ))
         
         conn.commit()
-        cursor.close()
-        conn.close()
         return True
     except Exception as e:
-        print(f"Error saving model evaluation: {str(e)}")
-        return False
+        # Re-raise the exception to make it visible
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to save model evaluation: {str(e)}"
+        )
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
 
 def log_prediction_to_db(file_name: str, true_label: str, predicted_label: str, confidence: float = None):
     """Log prediction to database history"""
@@ -351,12 +367,7 @@ async def predict(file: UploadFile = File(...)):
 # ----------- RETRAINING ENDPOINT -----------
 
 
-# Predefined list of possible labels
-labels = [
-    "air_conditioner", "car_horn", "children_playing", "dog_bark", 
-    "drilling", "engine_idling", "gun_shot", "jackhammer", "siren", 
-    "street_music"
-]
+
 
 @app.post("/retrain")
 async def retrain(
@@ -405,7 +416,7 @@ async def retrain(
             try:
                 # Match label from filename
                 matched_label = None
-                for label in labels:
+                for label in CLASS_NAMES:
                     if label in file_name.lower():
                         matched_label = label
                         break
@@ -499,6 +510,7 @@ async def retrain(
             os.rmdir("temp_retrain_dir")
         
         raise HTTPException(status_code=500, detail=f"Retraining failed: {str(e)}")
+    
     
 # ----------- METRICS ENDPOINT -----------
 @app.get("/metrics")
