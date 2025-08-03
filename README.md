@@ -125,6 +125,7 @@ Navigate to [http://localhost:8089](http://localhost:8089)
 
 <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/5cb61207-4d17-480e-ae3b-33ce8268598c" />
 
+<img width="1919" height="928" alt="image" src="https://github.com/user-attachments/assets/17d26b6d-ed5d-4e1e-9baa-99444ce98405" />
 
 
 ### Frontend Setup Instructions
@@ -186,4 +187,10 @@ Fully integrated via psycopg2 with automatic logging.
 
 **Lscblack (Loue Sauveur Christian)**
 [github.com/lscblack](https://github.com/lscblack)
+## Frontend Screen Shots
+<img width="1919" height="928" alt="image" src="https://github.com/user-attachments/assets/07534919-f098-40bd-9196-27699a2d904b" />
+<img width="1919" height="928" alt="image" src="https://github.com/user-attachments/assets/d3283f26-92b3-42ba-a4a2-80dc348e74cc" />
+<img width="1919" height="928" alt="image" src="https://github.com/user-attachments/assets/050248b5-09f0-4699-88a5-6bdcf043aff2" />
+
+
 
