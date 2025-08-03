@@ -92,79 +92,79 @@ const Dashboard = () => {
       console.error('Error fetching prediction history:', error);
     }
   };
-const startRecording = async () => {
-  try {
-    // Stop any existing recording first
-    if (mediaRecorderRef.current?.state === 'recording') {
-      mediaRecorderRef.current.stop();
-    }
-
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        sampleRate: 16000,    // Set to your model's required sample rate
-        channelCount: 1,      // Mono audio
-        echoCancellation: false,
-        noiseSuppression: false,
-        autoGainControl: false
+  const startRecording = async () => {
+    try {
+      // Stop any existing recording first
+      if (mediaRecorderRef.current?.state === 'recording') {
+        mediaRecorderRef.current.stop();
       }
-    });
 
-    mediaRecorderRef.current = new MediaRecorder(stream);
-    audioChunksRef.current = [];
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          sampleRate: 16000,    // Set to your model's required sample rate
+          channelCount: 1,      // Mono audio
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false
+        }
+      });
 
-    mediaRecorderRef.current.ondataavailable = (event) => {
-      if (event.data.size > 0) {
-        audioChunksRef.current.push(event.data);
-      }
-    };
+      mediaRecorderRef.current = new MediaRecorder(stream);
+      audioChunksRef.current = [];
 
-    mediaRecorderRef.current.onstop = () => {
-      const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-
-      // Convert to proper WAV format
-      const reader = new FileReader();
-      reader.onload = () => {
-        const arrayBuffer = reader.result;
-        const wavBlob = encodeWAV(arrayBuffer, 16000, 1);
-        const audioFile = new File([wavBlob], `recording_${Date.now()}.wav`, {
-          type: 'audio/wav'
-        });
-        setRecordedAudio(audioFile);
-        setPredictFile(audioFile);
+      mediaRecorderRef.current.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
       };
-      reader.onerror = () => {
-        console.error('FileReader error');
+
+      mediaRecorderRef.current.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+
+        // Convert to proper WAV format
+        const reader = new FileReader();
+        reader.onload = () => {
+          const arrayBuffer = reader.result;
+          const wavBlob = encodeWAV(arrayBuffer, 16000, 1);
+          const audioFile = new File([wavBlob], `recording_${Date.now()}.wav`, {
+            type: 'audio/wav'
+          });
+          setRecordedAudio(audioFile);
+          setPredictFile(audioFile);
+        };
+        reader.onerror = () => {
+          console.error('FileReader error');
+          stream.getTracks().forEach(track => track.stop());
+        };
+        reader.readAsArrayBuffer(audioBlob);
+
         stream.getTracks().forEach(track => track.stop());
       };
-      reader.readAsArrayBuffer(audioBlob);
 
-      stream.getTracks().forEach(track => track.stop());
-    };
+      mediaRecorderRef.current.start(100); // Collect data every 100ms
+      setIsRecording(true);
+      setRecordingDuration(0);
 
-    mediaRecorderRef.current.start(100); // Collect data every 100ms
-    setIsRecording(true);
-    setRecordingDuration(0);
-
-    recordingIntervalRef.current = setInterval(() => {
-      setRecordingDuration(prev => prev + 1);
-    }, 1000);
-  } catch (error) {
-    console.error('Error starting recording:', error);
-    alert('Error accessing microphone. Please check permissions.');
-    setIsRecording(false);
-    clearInterval(recordingIntervalRef.current);
-  }
-};
-
-const stopRecording = () => {
-  if (mediaRecorderRef.current && isRecording) {
-    mediaRecorderRef.current.stop();
-    setIsRecording(false);
-    if (recordingIntervalRef.current) {
+      recordingIntervalRef.current = setInterval(() => {
+        setRecordingDuration(prev => prev + 1);
+      }, 1000);
+    } catch (error) {
+      console.error('Error starting recording:', error);
+      alert('Error accessing microphone. Please check permissions.');
+      setIsRecording(false);
       clearInterval(recordingIntervalRef.current);
     }
-  }
-};
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      if (recordingIntervalRef.current) {
+        clearInterval(recordingIntervalRef.current);
+      }
+    }
+  };
 
   const clearRecording = () => {
     setRecordedAudio(null);
@@ -286,8 +286,8 @@ const stopRecording = () => {
     <button
       onClick={() => onClick(id)}
       className={`flex items-center space-x-2 px-6 py-3 rounded-lg transition-all duration-200 ${isActive
-          ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white'
-          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+        ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white'
+        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
         }`}
     >
       <Icon size={20} />
@@ -981,7 +981,7 @@ function writeString(view, offset, string) {
 function encodeWAV(audioData, sampleRate, numChannels) {
   const buffer = new ArrayBuffer(44 + audioData.byteLength);
   const view = new DataView(buffer);
-  
+
   // RIFF identifier
   writeString(view, 0, 'RIFF');
   // file length
@@ -1008,14 +1008,14 @@ function encodeWAV(audioData, sampleRate, numChannels) {
   writeString(view, 36, 'data');
   // data chunk length
   view.setUint32(40, audioData.byteLength, true);
-  
+
   // write the PCM samples
   const audioBuffer = new Uint8Array(audioData);
   const dataView = new Uint8Array(buffer, 44);
   for (let i = 0; i < audioBuffer.length; i++) {
     dataView[i] = audioBuffer[i];
   }
-  
+
   return new Blob([view], { type: 'audio/wav' });
 }
 export default Dashboard;
