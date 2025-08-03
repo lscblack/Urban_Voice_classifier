@@ -809,6 +809,7 @@ const Dashboard = () => {
                   <div className="space-y-3">
                     {trainingHistory.map((entry, index) => (
                       <div key={entry.id} className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-4">
+                        <span className="font-bold mb-5 block text-green-500">({entry.model_name})</span>
                         <div className="flex items-center justify-between mb-2">
                           <span className="font-medium text-gray-900">Training #{trainingHistory.length - index}</span>
                           <span className="text-sm text-gray-500">
@@ -819,6 +820,14 @@ const Dashboard = () => {
                           <div>
                             <span className="text-gray-600">Accuracy:</span>
                             <span className="font-medium ml-1">{(entry.accuracy * 100).toFixed(1)}%</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-600">Precision:</span>
+                            <span className="font-medium ml-1">{(entry.precision * 100).toFixed(1)}%</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-600">recall:</span>
+                            <span className="font-medium ml-1">{(entry.recall * 100).toFixed(1)}%</span>
                           </div>
                           <div>
                             <span className="text-gray-600">F1-Score:</span>
