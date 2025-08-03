@@ -993,50 +993,58 @@ const Dashboard = () => {
     </div>
   );
 };
-// Helper function to write string to DataView
+// Helper function to write strings to the DataView
 function writeString(view, offset, string) {
   for (let i = 0; i < string.length; i++) {
     view.setUint8(offset + i, string.charCodeAt(i));
   }
 }
 
-// Helper function to encode audio as WAV
+// Improved WAV encoder that handles Float32 to Int16 conversion
 function encodeWAV(audioData, sampleRate, numChannels) {
-  const buffer = new ArrayBuffer(44 + audioData.byteLength);
+  // Convert the audio data to 16-bit PCM if it's Float32
+  let pcmData;
+  if (audioData instanceof Float32Array) {
+    pcmData = new Int16Array(audioData.length);
+    for (let i = 0; i < audioData.length; i++) {
+      const s = Math.max(-1, Math.min(1, audioData[i]));
+      pcmData[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+    }
+  } else {
+    // Assume it's already in the correct format
+    pcmData = new Uint8Array(audioData);
+  }
+
+  const byteLength = pcmData.byteLength || pcmData.length * 2;
+  const buffer = new ArrayBuffer(44 + byteLength);
   const view = new DataView(buffer);
 
-  // RIFF identifier
+  // RIFF header
   writeString(view, 0, 'RIFF');
-  // file length
-  view.setUint32(4, 36 + audioData.byteLength, true);
-  // RIFF type
+  view.setUint32(4, 36 + byteLength, true); // file length
   writeString(view, 8, 'WAVE');
-  // format chunk identifier
+  
+  // Format chunk
   writeString(view, 12, 'fmt ');
-  // format chunk length
-  view.setUint32(16, 16, true);
-  // sample format (raw)
-  view.setUint16(20, 1, true);
-  // channel count
+  view.setUint32(16, 16, true); // chunk length
+  view.setUint16(20, 1, true); // PCM format
   view.setUint16(22, numChannels, true);
-  // sample rate
   view.setUint32(24, sampleRate, true);
-  // byte rate (sample rate * block align)
-  view.setUint32(28, sampleRate * numChannels * 2, true);
-  // block align (channel count * bytes per sample)
-  view.setUint16(32, numChannels * 2, true);
-  // bits per sample
-  view.setUint16(34, 16, true);
-  // data chunk identifier
+  view.setUint32(28, sampleRate * numChannels * 2, true); // byte rate
+  view.setUint16(32, numChannels * 2, true); // block align
+  view.setUint16(34, 16, true); // bits per sample
+  
+  // Data chunk
   writeString(view, 36, 'data');
-  // data chunk length
-  view.setUint32(40, audioData.byteLength, true);
-
-  // write the PCM samples
-  const audioBuffer = new Uint8Array(audioData);
-  const dataView = new Uint8Array(buffer, 44);
-  for (let i = 0; i < audioBuffer.length; i++) {
-    dataView[i] = audioBuffer[i];
+  view.setUint32(40, byteLength, true);
+  
+  // Write the PCM data
+  if (pcmData instanceof Int16Array) {
+    const dataView = new Int16Array(buffer, 44);
+    dataView.set(pcmData);
+  } else {
+    const dataView = new Uint8Array(buffer, 44);
+    dataView.set(pcmData);
   }
 
   return new Blob([view], { type: 'audio/wav' });
