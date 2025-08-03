@@ -121,12 +121,10 @@ locust -f simulation/locustfile.py --host=http://localhost:8000
 
 Navigate to [http://localhost:8089](http://localhost:8089)
 
-### 3. Sample Results Summary:
+### 3. Locust Results Summary:
 
-| Users | Requests/sec | Median Latency | Failure Rate |
-| ----- | ------------ | -------------- | ------------ |
-| 50    | 150 req/s    | 200 ms         | 0%           |
-| 100   | 280 req/s    | 230 ms         | 1.2%         |
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/5cb61207-4d17-480e-ae3b-33ce8268598c" />
+
 
 
 ### Frontend Setup Instructions
