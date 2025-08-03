@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { 
-  Upload, 
-  Brain, 
-  BarChart3, 
-  History, 
-  RefreshCw, 
-  Activity, 
-  FileAudio, 
+import {
+  Upload,
+  Brain,
+  BarChart3,
+  History,
+  RefreshCw,
+  Activity,
+  FileAudio,
   Zap,
   TrendingUp,
   Database,
@@ -95,7 +95,16 @@ const Dashboard = () => {
 
   const startRecording = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          sampleRate: 16000,    // Set to your model's required sample rate
+          channelCount: 1,      // Mono audio
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false
+        }
+      });
+
       mediaRecorderRef.current = new MediaRecorder(stream);
       audioChunksRef.current = [];
 
@@ -104,17 +113,28 @@ const Dashboard = () => {
       };
 
       mediaRecorderRef.current.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
-        const audioFile = new File([audioBlob], `recording_${Date.now()}.wav`, { type: 'audio/wav' });
-        setRecordedAudio(audioFile);
-        setPredictFile(audioFile);
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' }); // Note: changed from audio/wav
+
+        // Convert to proper WAV format
+        const reader = new FileReader();
+        reader.onload = () => {
+          const arrayBuffer = reader.result;
+          const wavBlob = encodeWAV(arrayBuffer, 16000, 1);
+          const audioFile = new File([wavBlob], `recording_${Date.now()}.wav`, {
+            type: 'audio/wav'
+          });
+          setRecordedAudio(audioFile);
+          setPredictFile(audioFile);
+        };
+        reader.readAsArrayBuffer(audioBlob);
+
         stream.getTracks().forEach(track => track.stop());
       };
 
       mediaRecorderRef.current.start();
       setIsRecording(true);
       setRecordingDuration(0);
-      
+
       recordingIntervalRef.current = setInterval(() => {
         setRecordingDuration(prev => prev + 1);
       }, 1000);
@@ -152,7 +172,7 @@ const Dashboard = () => {
   };
 
   const updateRetrainFile = (id, field, value) => {
-    setRetrainFiles(retrainFiles.map(file => 
+    setRetrainFiles(retrainFiles.map(file =>
       file.id === id ? { ...file, [field]: value } : file
     ));
   };
@@ -164,7 +184,7 @@ const Dashboard = () => {
 
   const handlePredict = async () => {
     if (!predictFile) return;
-    
+
     setLoading(true);
     const formData = new FormData();
     formData.append('file', predictFile);
@@ -190,21 +210,21 @@ const Dashboard = () => {
   const handleRetrain = async () => {
     const validFiles = retrainFiles.filter(file => file.file && file.label);
     if (!canRetrain()) return;
-    
+
     setLoading(true);
-    
+
     try {
       // Send files in batches or individually - depending on your API design
       for (const fileData of validFiles) {
         const formData = new FormData();
         formData.append('file', fileData.file);
         formData.append('label', fileData.label);
-        
+
         await axios.post(`${API_BASE_URL}/retrain`, formData, {
           headers: { 'Content-Type': 'multipart/form-data' }
         });
       }
-      
+
       alert(`Model retrained successfully with ${validFiles.length} files!`);
       setRetrainFiles([]);
       fetchTrainingHistory();
@@ -219,7 +239,7 @@ const Dashboard = () => {
 
   const handleLogPrediction = async () => {
     if (!logFile || !logLabel) return;
-    
+
     setLoading(true);
     const formData = new FormData();
     formData.append('file', logFile);
@@ -251,11 +271,10 @@ const Dashboard = () => {
   const TabButton = ({ id, label, icon: Icon, isActive, onClick }) => (
     <button
       onClick={() => onClick(id)}
-      className={`flex items-center space-x-2 px-6 py-3 rounded-lg transition-all duration-200 ${
-        isActive 
-          ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white' 
+      className={`flex items-center space-x-2 px-6 py-3 rounded-lg transition-all duration-200 ${isActive
+          ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white'
           : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-      }`}
+        }`}
     >
       <Icon size={20} />
       <span className="font-medium">{label}</span>
@@ -303,7 +322,7 @@ const Dashboard = () => {
         <h3 className="font-medium text-gray-900">Record Audio</h3>
         <p className="text-xs text-gray-500">Record directly from microphone</p>
       </div>
-      
+
       {!isRecording && !recordedAudio && (
         <button
           onClick={startRecording}
@@ -314,7 +333,7 @@ const Dashboard = () => {
           <span>Start Recording</span>
         </button>
       )}
-      
+
       {isRecording && (
         <div className="text-center space-y-4">
           <div className="flex items-center justify-center space-x-2">
@@ -330,7 +349,7 @@ const Dashboard = () => {
           </button>
         </div>
       )}
-      
+
       {recordedAudio && (
         <div className="space-y-3">
           <div className="bg-green-50 border border-green-200 rounded-lg p-3">
@@ -371,7 +390,7 @@ const Dashboard = () => {
           </button>
         </div>
       </div>
-      
+
       {retrainFiles.length === 0 && (
         <div className="text-center py-8 border border-dashed border-gray-300 rounded-lg">
           <FileAudio className="mx-auto text-gray-400 mb-2" size={32} />
@@ -384,7 +403,7 @@ const Dashboard = () => {
           </button>
         </div>
       )}
-      
+
       {retrainFiles.map((fileData, index) => (
         <div key={fileData.id} className="border border-gray-200 rounded-lg p-4 space-y-3">
           <div className="flex items-center justify-between">
@@ -396,7 +415,7 @@ const Dashboard = () => {
               <Minus size={16} />
             </button>
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Audio File</label>
@@ -415,7 +434,7 @@ const Dashboard = () => {
                 </label>
               </div>
             </div>
-            
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Label</label>
               <select
@@ -433,14 +452,14 @@ const Dashboard = () => {
           </div>
         </div>
       ))}
-      
+
       {retrainFiles.length > 0 && (
         <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-4">
           <div className="flex items-center justify-between">
             <div>
               <p className="font-medium text-blue-900">Batch Training</p>
               <p className="text-sm text-blue-700">
-                {canRetrain() 
+                {canRetrain()
                   ? `Ready to train with ${retrainFiles.filter(f => f.file && f.label).length} files`
                   : `Need ${Math.ceil(retrainFiles.filter(f => f.file && f.label).length / 10) * 10 - retrainFiles.filter(f => f.file && f.label).length} more files (minimum 10, multiples of 10)`
                 }
@@ -565,7 +584,7 @@ const Dashboard = () => {
                 <Play className="text-blue-600" size={24} />
                 <h2 className="text-2xl font-bold text-gray-900">Make Prediction</h2>
               </div>
-              
+
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <div className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -578,16 +597,16 @@ const Dashboard = () => {
                     />
                     <AudioRecorder />
                   </div>
-                  
+
                   {uploadProgress > 0 && (
                     <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div 
+                      <div
                         className="bg-gradient-to-r from-blue-500 to-purple-600 h-2 rounded-full transition-all duration-300"
                         style={{ width: `${uploadProgress}%` }}
                       />
                     </div>
                   )}
-                  
+
                   <button
                     onClick={handlePredict}
                     disabled={!predictFile || loading}
@@ -616,7 +635,7 @@ const Dashboard = () => {
                             <span className="text-sm font-medium">{className}</span>
                             <div className="flex items-center space-x-2">
                               <div className="w-20 bg-gray-200 rounded-full h-2">
-                                <div 
+                                <div
                                   className={`h-2 rounded-full ${data.is_predicted ? 'bg-gradient-to-r from-blue-500 to-purple-600' : 'bg-gray-300'}`}
                                   style={{ width: `${data.probability * 100}%` }}
                                 />
@@ -698,7 +717,7 @@ const Dashboard = () => {
                     label="test audio"
                     disabled={loading}
                   />
-                  
+
                   <select
                     value={logLabel}
                     onChange={(e) => setLogLabel(e.target.value)}
@@ -732,7 +751,7 @@ const Dashboard = () => {
                         <p className="text-2xl font-bold text-green-800">{metrics.total_samples}</p>
                       </div>
                     </div>
-                    
+
                     {metrics.classification_report?.weighted_avg && (
                       <div className="grid grid-cols-3 gap-4">
                         <div className="bg-gradient-to-r from-purple-50 to-purple-100 p-4 rounded-lg">
@@ -812,8 +831,8 @@ const Dashboard = () => {
                         <div className="flex items-center justify-between mb-2">
                           <span className="font-medium text-gray-900 truncate">{entry.file_name}</span>
                           {entry.is_correct !== null && (
-                            entry.is_correct ? 
-                              <CheckCircle className="text-green-600" size={16} /> : 
+                            entry.is_correct ?
+                              <CheckCircle className="text-green-600" size={16} /> :
                               <XCircle className="text-red-600" size={16} />
                           )}
                         </div>
@@ -937,5 +956,52 @@ const Dashboard = () => {
     </div>
   );
 };
+// Helper function to write string to DataView
+function writeString(view, offset, string) {
+  for (let i = 0; i < string.length; i++) {
+    view.setUint8(offset + i, string.charCodeAt(i));
+  }
+}
 
+// Helper function to encode audio as WAV
+function encodeWAV(audioData, sampleRate, numChannels) {
+  const buffer = new ArrayBuffer(44 + audioData.byteLength);
+  const view = new DataView(buffer);
+  
+  // RIFF identifier
+  writeString(view, 0, 'RIFF');
+  // file length
+  view.setUint32(4, 36 + audioData.byteLength, true);
+  // RIFF type
+  writeString(view, 8, 'WAVE');
+  // format chunk identifier
+  writeString(view, 12, 'fmt ');
+  // format chunk length
+  view.setUint32(16, 16, true);
+  // sample format (raw)
+  view.setUint16(20, 1, true);
+  // channel count
+  view.setUint16(22, numChannels, true);
+  // sample rate
+  view.setUint32(24, sampleRate, true);
+  // byte rate (sample rate * block align)
+  view.setUint32(28, sampleRate * numChannels * 2, true);
+  // block align (channel count * bytes per sample)
+  view.setUint16(32, numChannels * 2, true);
+  // bits per sample
+  view.setUint16(34, 16, true);
+  // data chunk identifier
+  writeString(view, 36, 'data');
+  // data chunk length
+  view.setUint32(40, audioData.byteLength, true);
+  
+  // write the PCM samples
+  const audioBuffer = new Uint8Array(audioData);
+  const dataView = new Uint8Array(buffer, 44);
+  for (let i = 0; i < audioBuffer.length; i++) {
+    dataView[i] = audioBuffer[i];
+  }
+  
+  return new Blob([view], { type: 'audio/wav' });
+}
 export default Dashboard;
