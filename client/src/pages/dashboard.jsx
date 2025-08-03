@@ -101,15 +101,23 @@ const Dashboard = () => {
 
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
-          sampleRate: 16000,    // Set to your model's required sample rate
-          channelCount: 1,      // Mono audio
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false
+          sampleRate: 16000,    // 16kHz sample rate
+          channelCount: 1,       // Mono
+          echoCancellation: true, // Enabled for better quality
+          noiseSuppression: true, // Enabled to reduce background noise
+          autoGainControl: true   // Enabled to normalize volume
         }
       });
 
-      mediaRecorderRef.current = new MediaRecorder(stream);
+      // Create audio context to monitor input
+      const audioContext = new AudioContext();
+      const sourceNode = audioContext.createMediaStreamSource(stream);
+      sourceNode.connect(audioContext.destination); // Enable monitoring
+
+      mediaRecorderRef.current = new MediaRecorder(stream, {
+        mimeType: 'audio/webm;codecs=opus' // Better browser support
+      });
+
       audioChunksRef.current = [];
 
       mediaRecorderRef.current.ondataavailable = (event) => {
@@ -118,10 +126,20 @@ const Dashboard = () => {
         }
       };
 
-      mediaRecorderRef.current.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+      mediaRecorderRef.current.onstop = async () => {
+        // Disconnect monitoring
+        sourceNode.disconnect();
+        await audioContext.close();
 
-        // Convert to proper WAV format
+        const audioBlob = new Blob(audioChunksRef.current, {
+          type: 'audio/webm'
+        });
+
+        // Create URL for playback
+        const audioUrl = URL.createObjectURL(audioBlob);
+        setAudioPreviewUrl(audioUrl); // Add this state to your component
+
+        // Convert to WAV if needed
         const reader = new FileReader();
         reader.onload = () => {
           const arrayBuffer = reader.result;
@@ -132,16 +150,12 @@ const Dashboard = () => {
           setRecordedAudio(audioFile);
           setPredictFile(audioFile);
         };
-        reader.onerror = () => {
-          console.error('FileReader error');
-          stream.getTracks().forEach(track => track.stop());
-        };
         reader.readAsArrayBuffer(audioBlob);
 
         stream.getTracks().forEach(track => track.stop());
       };
 
-      mediaRecorderRef.current.start(100); // Collect data every 100ms
+      mediaRecorderRef.current.start(200); // Collect data every 200ms
       setIsRecording(true);
       setRecordingDuration(0);
 
@@ -150,21 +164,21 @@ const Dashboard = () => {
       }, 1000);
     } catch (error) {
       console.error('Error starting recording:', error);
-      alert('Error accessing microphone. Please check permissions.');
+      alert(`Recording error: ${error.message}`);
       setIsRecording(false);
       clearInterval(recordingIntervalRef.current);
     }
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
+    if (mediaRecorderRef.current?.state === 'recording') {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
-      if (recordingIntervalRef.current) {
-        clearInterval(recordingIntervalRef.current);
-      }
+      clearInterval(recordingIntervalRef.current);
     }
   };
+
+
 
   const clearRecording = () => {
     setRecordedAudio(null);
