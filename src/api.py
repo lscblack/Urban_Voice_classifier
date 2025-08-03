@@ -2,7 +2,8 @@ from fastapi import FastAPI, File, UploadFile, Form
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 import librosa
-from fastapi import HTTPException  
+import zipfile
+from fastapi import APIRouter, UploadFile, File, HTTPException, Form
 import numpy as np
 import os
 import joblib
@@ -348,100 +349,157 @@ async def predict(file: UploadFile = File(...)):
         )  
     
 # ----------- RETRAINING ENDPOINT -----------
+
+
+# Predefined list of possible labels
+labels = [
+    "air_conditioner", "car_horn", "children_playing", "dog_bark", 
+    "drilling", "engine_idling", "gun_shot", "jackhammer", "siren", 
+    "street_music"
+]
+
 @app.post("/retrain")
 async def retrain(
-    files: List[UploadFile] = File(...),
-    labels: List[str] = Form(...),
+    zip_file: UploadFile = File(...),
     test_size: float = Form(0.2)
 ):
     try:
-        # Validate inputs
-        if len(files) != len(labels):
-            raise HTTPException(status_code=400, detail="Number of files and labels must match")
-            
-        if len(files) < 10 or len(files) % 10 != 0:
-            raise HTTPException(
-                status_code=400, 
-                detail="Minimum 10 files required and must be in multiples of 10"
-            )
+        # Check if the file is a ZIP file
+        if not zip_file.filename.lower().endswith('.zip'):
+            raise HTTPException(status_code=400, detail="Only ZIP files are supported")
 
-        # Validate all files are WAV
-        for file in files:
-            if not file.filename.lower().endswith('.wav'):
-                raise HTTPException(status_code=400, detail="Only WAV files are supported")
-
-        # 1. Evaluate old model first
-        X_test_old, y_test_old = get_test_data()
-        y_pred_old = model.predict(X_test_old)
-        old_report = classification_report(y_test_old, y_pred_old, output_dict=True)
-        old_conf_matrix = confusion_matrix(y_test_old, y_pred_old).tolist()
+        # Load existing model artifacts
+        model = joblib.load(MODEL_PATH)
+        scaler = joblib.load(SCALER_PATH)
+        label_encoder = joblib.load(ENCODER_PATH)
         
-        # Save old model metrics
-        save_model_evaluation({
-            "accuracy": accuracy_score(y_test_old, y_pred_old),
-            "precision": old_report['weighted avg']['precision'],
-            "recall": old_report['weighted avg']['recall'],
-            "f1_score": old_report['weighted avg']['f1-score'],
-            "classification_report": old_report,
-            "confusion_matrix": old_conf_matrix
-        }, is_retraining=False, notes="Pre-retraining evaluation")
+        # Load training data from CSV files
+        X_train = pd.read_csv('../models/X_train.csv').values
+        y_train = pd.read_csv('../models/y_train.csv')['label'].values
+        X_test = pd.read_csv('../models/X_test.csv').values
+        y_test = pd.read_csv('../models/y_test.csv')['label'].values
 
-        # 2. Process all new files
+        # Get current model performance
+        X_test_scaled = scaler.transform(X_test)
+        y_pred = model.predict(X_test_scaled)
+        old_report = classification_report(y_test, y_pred, output_dict=True)
+
+        # Step 1: Unzip the file
+        contents = await zip_file.read()
+        zip_path = f"temp_{zip_file.filename}"
+        with open(zip_path, "wb") as f:
+            f.write(contents)
+
+        with zipfile.ZipFile(zip_path, "r") as zip_ref:
+            zip_ref.extractall("temp_retrain_dir")
+
+        # Step 2: Process files
         all_mfccs = []
         all_labels = []
+        processed_files = []
         
-        for file, label in zip(files, labels):
-            contents = await file.read()
-            with io.BytesIO(contents) as audio_file:
-                # Save temporary file for feature extraction
-                temp_path = f"retrain_temp_{file.filename}"
-                with open(temp_path, "wb") as f:
-                    f.write(contents)
+        for file_name in os.listdir("temp_retrain_dir"):
+            if not file_name.lower().endswith('.wav'):
+                continue
                 
-                mfcc = extract_features(temp_path)
-                all_mfccs.append(mfcc)
-                all_labels.append(label)
-                os.remove(temp_path)
+            try:
+                # Match label from filename
+                matched_label = None
+                for label in labels:
+                    if label in file_name.lower():
+                        matched_label = label
+                        break
+                
+                if not matched_label:
+                    print(f"Skipping {file_name} - no matching label found")
+                    continue
 
-        # Prepare new data plus old train data
-        X_new = np.vstack((X_train, np.array(all_mfccs)))
-        y_new = np.vstack((y_train, label_encoder.transform(all_labels)))
-        X_new = scaler.transform(X_new)
+                # Extract features
+                file_path = os.path.join("temp_retrain_dir", file_name)
+                mfcc = extract_features(file_path)
+                
+                # Ensure consistent shape (1, 40) for MFCC features
+                if mfcc.ndim == 1:
+                    mfcc = mfcc.reshape(1, -1)
+                
+                if mfcc.shape[1] != 40:
+                    raise ValueError(f"Expected 40 MFCC features, got {mfcc.shape[1]}")
+                
+                all_mfccs.append(mfcc)
+                all_labels.append(matched_label)
+                processed_files.append(file_name)
+
+            except Exception as e:
+                print(f"Error processing {file_name}: {str(e)}")
+                continue
+
+        # Clean up temporary files
+        for f in os.listdir("temp_retrain_dir"):
+            os.remove(os.path.join("temp_retrain_dir", f))
+        os.rmdir("temp_retrain_dir")
+        os.remove(zip_path)
+
+        if not all_mfccs:
+            raise HTTPException(status_code=400, detail="No valid audio files found in ZIP")
+
+        # Prepare new data
+        X_new = np.vstack(all_mfccs)
+        y_new = label_encoder.transform(all_labels)
+
+        # Combine with existing data
+        X_combined = np.vstack([X_train, X_new])
+        y_combined = np.concatenate([y_train, y_new])
+
+        # Retrain model with refitted scaler
+        scaler.fit(X_combined)  # Refit scaler on combined data
+        X_scaled = scaler.transform(X_combined)
+        model.fit(X_scaled, y_combined)
+
+        # Evaluate
+        X_test_scaled = scaler.transform(X_test)
+        y_pred_new = model.predict(X_test_scaled)
+        new_report = classification_report(y_test, y_pred_new, output_dict=True)
+        new_conf_matrix = confusion_matrix(y_test, y_pred_new).tolist()
+
+        # Save updated artifacts
+        joblib.dump(model, MODEL_PATH)
+        joblib.dump(scaler, SCALER_PATH)
         
-        # 3. Retrain model
-        model.fit(X_new, y_new.ravel())
-        
-        # 4. Evaluate new model
-        y_pred_new = model.predict(X_test_old)
-        new_report = classification_report(y_test_old, y_pred_new, output_dict=True)
-        new_conf_matrix = confusion_matrix(y_test_old, y_pred_new).tolist()
-        
-        # Save new model metrics
+        # Update training data CSVs
+        pd.DataFrame(X_combined).to_csv('../models/X_train.csv', index=False)
+        pd.DataFrame(y_combined, columns=['label']).to_csv('../models/y_train.csv', index=False)
+
+        # Save evaluation to database
         save_model_evaluation({
-            "accuracy": accuracy_score(y_test_old, y_pred_new),
+            "accuracy": accuracy_score(y_test, y_pred_new),
             "precision": new_report['weighted avg']['precision'],
             "recall": new_report['weighted avg']['recall'],
             "f1_score": new_report['weighted avg']['f1-score'],
             "classification_report": new_report,
-            "confusion_matrix": new_conf_matrix
-        }, is_retraining=True, samples_added=len(files), notes=f"Retrained with {len(files)} samples")
-
-        # 5. Save updated model
-        model_path = '../models/urbansound_model.pkl'
-        joblib.dump(model, model_path)
+            "confusion_matrix": new_conf_matrix,
+            "samples_added": len(all_labels)
+        }, is_retraining=True, notes=f"Retrained with {len(all_labels)} samples")
 
         return {
             "status": "success",
             "old_model_performance": old_report,
             "new_model_performance": new_report,
-            "improvement": calculate_improvement(old_report, new_report),
-            "samples_added": len(files),
-            "model_path": model_path
+            "samples_added": len(all_labels),
+            "processed_files": processed_files,
+            "model_path": MODEL_PATH
         }
 
     except Exception as e:
+        # Clean up if any files remain
+        if 'zip_path' in locals() and os.path.exists(zip_path):
+            os.remove(zip_path)
+        if 'temp_retrain_dir' in locals() and os.path.exists("temp_retrain_dir"):
+            for f in os.listdir("temp_retrain_dir"):
+                os.remove(os.path.join("temp_retrain_dir", f))
+            os.rmdir("temp_retrain_dir")
+        
         raise HTTPException(status_code=500, detail=f"Retraining failed: {str(e)}")
-
+    
 # ----------- METRICS ENDPOINT -----------
 @app.get("/metrics")
 def metrics():

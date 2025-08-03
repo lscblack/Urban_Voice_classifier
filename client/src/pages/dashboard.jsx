@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import JSZip from 'jszip';
+import { FileArchive } from 'lucide-react';
 import {
   Upload,
   Brain,
@@ -290,51 +292,27 @@ const Dashboard = () => {
     }
   };
   const handleRetrain = async () => {
-    const validFiles = retrainFiles.filter(file => file.file && file.label);
-    if (!canRetrain()) return;
-
-    // Validate minimum files requirement (matching your backend validation)
-    if (validFiles.length < 10 || validFiles.length % 10 !== 0) {
-      alert("Minimum 10 files required and must be in multiples of 10");
-      return;
-    }
+    if (retrainFiles.length === 0 || !retrainFiles[0].file) return;
 
     setLoading(true);
 
     try {
       const formData = new FormData();
-
-      // Append all files
-      validFiles.forEach((fileData) => {
-        formData.append('files', fileData.file);
-      });
-
-      // Append all labels
-      validFiles.forEach((fileData) => {
-        formData.append('labels', fileData.label);
-      });
-
-      // Append test_size (using your default of 0.2)
+      formData.append('zip_file', retrainFiles[0].file);
       formData.append('test_size', '0.2');
 
       const response = await axios.post(`${API_BASE_URL}/retrain`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
 
-      alert(`Model retrained successfully with ${validFiles.length} files!\n` +
-        `New accuracy: ${response.data.new_model_performance.accuracy.toFixed(2)}`);
-
+      alert(`Successfully retrained with files from ${retrainFiles[0].file.name}. Accuracy: ${(response.data.new_model_performance.accuracy * 100).toFixed(1)}%`);
       setRetrainFiles([]);
       fetchTrainingHistory();
       fetchModelInfo();
     } catch (error) {
       console.error('Retrain error:', error);
-      if (error.response) {
-        // Handle backend validation errors
-        alert(`Error: ${error.response.data.detail}`);
-      } else {
-        alert('Error during retraining. Please try again.');
-      }
+      const errorMsg = error.response?.data?.detail || 'Retraining failed. Please check your ZIP file and try again.';
+      alert(`Error: ${errorMsg}`);
     } finally {
       setLoading(false);
     }
@@ -475,101 +453,51 @@ const Dashboard = () => {
     </div>
   );
 
-  const MultiFileUpload = () => (
+  const ZipFileUpload = () => (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-gray-900">Training Files</h3>
-        <div className="flex items-center space-x-2">
-          <span className="text-sm text-gray-600">
-            {retrainFiles.filter(f => f.file && f.label).length} files ready
-          </span>
-          <button
-            onClick={addRetrainFile}
-            disabled={loading}
-            className="p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-          >
-            <Plus size={16} />
-          </button>
-        </div>
+        <h3 className="text-lg font-semibold text-gray-900">Training Data</h3>
       </div>
 
-      {retrainFiles.length === 0 && (
-        <div className="text-center py-8 border border-dashed border-gray-300 rounded-lg">
-          <FileAudio className="mx-auto text-gray-400 mb-2" size={32} />
-          <p className="text-gray-500">No files added yet</p>
-          <button
-            onClick={addRetrainFile}
-            className="mt-2 text-blue-600 hover:text-blue-500 font-medium"
-          >
-            Add your first file
-          </button>
-        </div>
-      )}
-
-      {retrainFiles.map((fileData, index) => (
-        <div key={fileData.id} className="border border-gray-200 rounded-lg p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="font-medium text-gray-900">File #{index + 1}</span>
-            <button
-              onClick={() => removeRetrainFile(fileData.id)}
-              className="text-red-600 hover:text-red-800"
-            >
-              <Minus size={16} />
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Audio File</label>
-              <div className="border border-dashed border-gray-300 rounded-lg p-3 text-center hover:border-blue-400 transition-colors">
-                <label className="cursor-pointer">
-                  <span className="text-sm text-blue-600 hover:text-blue-500">
-                    {fileData.file ? fileData.file.name : 'Choose file'}
-                  </span>
-                  <input
-                    type="file"
-                    accept=".wav"
-                    onChange={(e) => updateRetrainFile(fileData.id, 'file', e.target.files[0])}
-                    disabled={loading}
-                    className="hidden"
-                  />
-                </label>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Label</label>
-              <select
-                value={fileData.label}
-                onChange={(e) => updateRetrainFile(fileData.id, 'label', e.target.value)}
-                disabled={loading}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="">Select label</option>
-                {modelInfo?.classes?.map(cls => (
-                  <option key={cls} value={cls}>{cls}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
-      ))}
+      <div className="border border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-400 transition-colors">
+        <FileArchive className="mx-auto text-gray-400 mb-2" size={32} />
+        <label className="cursor-pointer">
+          <span className="text-sm font-medium text-blue-600 hover:text-blue-500">
+            {retrainFiles.length > 0 ? retrainFiles[0].file.name : 'Choose ZIP file'}
+          </span>
+          <input
+            type="file"
+            accept=".zip"
+            onChange={(e) => {
+              if (e.target.files && e.target.files.length > 0) {
+                setRetrainFiles([{
+                  id: Date.now(),
+                  file: e.target.files[0],
+                  label: '' // Not needed for ZIP upload
+                }]);
+              }
+            }}
+            disabled={loading}
+            className="hidden"
+          />
+        </label>
+        <p className="text-xs text-gray-500 mt-1">
+          ZIP file containing WAV files named like: "air_conditioner_1.wav", "dog_bark_2.wav", etc.
+        </p>
+      </div>
 
       {retrainFiles.length > 0 && (
         <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="font-medium text-blue-900">Batch Training</p>
+              <p className="font-medium text-blue-900">Ready for Training</p>
               <p className="text-sm text-blue-700">
-                {canRetrain()
-                  ? `Ready to train with ${retrainFiles.filter(f => f.file && f.label).length} files`
-                  : `Need ${Math.ceil(retrainFiles.filter(f => f.file && f.label).length / 10) * 10 - retrainFiles.filter(f => f.file && f.label).length} more files (minimum 10, multiples of 10)`
-                }
+                {retrainFiles[0].file.name} selected
               </p>
             </div>
             <button
               onClick={handleRetrain}
-              disabled={!canRetrain() || loading}
+              disabled={loading}
               className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:from-purple-600 hover:to-pink-700 transition-all"
             >
               {loading ? 'Training...' : 'Start Training'}
@@ -579,6 +507,8 @@ const Dashboard = () => {
       )}
     </div>
   );
+
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
@@ -764,7 +694,7 @@ const Dashboard = () => {
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-2">
-                  <MultiFileUpload />
+                  <ZipFileUpload />
                 </div>
 
                 <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-lg p-6">
@@ -773,10 +703,10 @@ const Dashboard = () => {
                     <h3 className="font-semibold text-yellow-800">Retraining Info</h3>
                   </div>
                   <ul className="text-sm text-yellow-700 space-y-2">
-                    <li>• Upload files in batches of 10, 20, 30, etc.</li>
-                    <li>• Each file needs a proper label</li>
-                    <li>• Model will be updated incrementally</li>
-                    <li>• Previous performance will be saved</li>
+                    <li>• Upload a single ZIP file containing WAV files</li>
+                    <li>• Files should be named with their labels (e.g., "dog_bark_1.wav")</li>
+                    <li>• Supported labels: {modelInfo?.classes?.join(', ') || 'loading...'}</li>
+                    <li>• Minimum 10 files recommended</li>
                     <li>• Process may take several minutes</li>
                   </ul>
                 </div>
