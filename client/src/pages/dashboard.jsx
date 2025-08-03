@@ -94,77 +94,75 @@ const Dashboard = () => {
   };
   const startRecording = async () => {
     try {
-      // Stop any existing recording first
+      // Stop any existing recording
       if (mediaRecorderRef.current?.state === 'recording') {
         mediaRecorderRef.current.stop();
       }
 
+      // Get audio stream
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
-          sampleRate: 16000,    // 16kHz sample rate
-          channelCount: 1,       // Mono
-          echoCancellation: true, // Enabled for better quality
-          noiseSuppression: true, // Enabled to reduce background noise
-          autoGainControl: true   // Enabled to normalize volume
+          sampleRate: 16000,
+          channelCount: 1,
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false
         }
       });
 
-      // Create audio context to monitor input
-      const audioContext = new AudioContext();
-      const sourceNode = audioContext.createMediaStreamSource(stream);
-      sourceNode.connect(audioContext.destination); // Enable monitoring
-
+      // Create MediaRecorder
       mediaRecorderRef.current = new MediaRecorder(stream, {
-        mimeType: 'audio/webm;codecs=opus' // Better browser support
+        mimeType: 'audio/webm'
       });
-
       audioChunksRef.current = [];
 
+      // Handle data available
       mediaRecorderRef.current.ondataavailable = (event) => {
         if (event.data.size > 0) {
           audioChunksRef.current.push(event.data);
         }
       };
 
+      // Handle recording stop
       mediaRecorderRef.current.onstop = async () => {
-        // Disconnect monitoring
-        sourceNode.disconnect();
-        await audioContext.close();
+        try {
+          // Combine all chunks
+          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
 
-        const audioBlob = new Blob(audioChunksRef.current, {
-          type: 'audio/webm'
-        });
+          // Convert webm to wav
+          const wavBlob = await convertWebmToWav(audioBlob);
 
-        // Create URL for playback
-        const audioUrl = URL.createObjectURL(audioBlob);
-        setAudioPreviewUrl(audioUrl); // Add this state to your component
-
-        // Convert to WAV if needed
-        const reader = new FileReader();
-        reader.onload = () => {
-          const arrayBuffer = reader.result;
-          const wavBlob = encodeWAV(arrayBuffer, 16000, 1);
+          // Create file object
           const audioFile = new File([wavBlob], `recording_${Date.now()}.wav`, {
             type: 'audio/wav'
           });
+
+          // Update state
           setRecordedAudio(audioFile);
           setPredictFile(audioFile);
-        };
-        reader.readAsArrayBuffer(audioBlob);
 
-        stream.getTracks().forEach(track => track.stop());
+          // Create preview URL
+          setAudioPreviewUrl(URL.createObjectURL(wavBlob));
+        } catch (error) {
+          console.error('Error processing recording:', error);
+        } finally {
+          // Clean up
+          stream.getTracks().forEach(track => track.stop());
+        }
       };
 
-      mediaRecorderRef.current.start(200); // Collect data every 200ms
+      // Start recording
+      mediaRecorderRef.current.start(100); // Collect data every 100ms
       setIsRecording(true);
       setRecordingDuration(0);
 
+      // Start duration timer
       recordingIntervalRef.current = setInterval(() => {
         setRecordingDuration(prev => prev + 1);
       }, 1000);
+
     } catch (error) {
       console.error('Error starting recording:', error);
-      alert(`Recording error: ${error.message}`);
       setIsRecording(false);
       clearInterval(recordingIntervalRef.current);
     }
@@ -178,6 +176,63 @@ const Dashboard = () => {
     }
   };
 
+  // New function to handle WebM to WAV conversion
+  async function convertWebmToWav(webmBlob) {
+    // Step 1: Decode the WebM audio
+    const arrayBuffer = await webmBlob.arrayBuffer();
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)({
+      sampleRate: 16000
+    });
+    const decodedData = await audioContext.decodeAudioData(arrayBuffer);
+
+    // Step 2: Get PCM data
+    const pcmData = decodedData.getChannelData(0); // Get mono channel
+
+    // Step 3: Convert to WAV
+    return encodeWAV(pcmData, audioContext.sampleRate, 1);
+  }
+
+  // Updated WAV encoder
+  function encodeWAV(samples, sampleRate, numChannels) {
+    const buffer = new ArrayBuffer(44 + samples.length * 2);
+    const view = new DataView(buffer);
+
+    // RIFF header
+    writeString(view, 0, 'RIFF');
+    view.setUint32(4, 36 + samples.length * 2, true);
+    writeString(view, 8, 'WAVE');
+
+    // Format chunk
+    writeString(view, 12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true); // PCM format
+    view.setUint16(22, numChannels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * numChannels * 2, true);
+    view.setUint16(32, numChannels * 2, true);
+    view.setUint16(34, 16, true);
+
+    // Data chunk
+    writeString(view, 36, 'data');
+    view.setUint32(40, samples.length * 2, true);
+
+    // Convert samples to 16-bit PCM
+    const volume = 1;
+    let index = 44;
+    for (let i = 0; i < samples.length; i++) {
+      const s = Math.max(-1, Math.min(1, samples[i]));
+      view.setInt16(index, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+      index += 2;
+    }
+
+    return new Blob([view], { type: 'audio/wav' });
+  }
+
+  function writeString(view, offset, string) {
+    for (let i = 0; i < string.length; i++) {
+      view.setUint8(offset + i, string.charCodeAt(i));
+    }
+  }
 
 
   const clearRecording = () => {
@@ -993,60 +1048,5 @@ const Dashboard = () => {
     </div>
   );
 };
-// Helper function to write strings to the DataView
-function writeString(view, offset, string) {
-  for (let i = 0; i < string.length; i++) {
-    view.setUint8(offset + i, string.charCodeAt(i));
-  }
-}
 
-// Improved WAV encoder that handles Float32 to Int16 conversion
-function encodeWAV(audioData, sampleRate, numChannels) {
-  // Convert the audio data to 16-bit PCM if it's Float32
-  let pcmData;
-  if (audioData instanceof Float32Array) {
-    pcmData = new Int16Array(audioData.length);
-    for (let i = 0; i < audioData.length; i++) {
-      const s = Math.max(-1, Math.min(1, audioData[i]));
-      pcmData[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-    }
-  } else {
-    // Assume it's already in the correct format
-    pcmData = new Uint8Array(audioData);
-  }
-
-  const byteLength = pcmData.byteLength || pcmData.length * 2;
-  const buffer = new ArrayBuffer(44 + byteLength);
-  const view = new DataView(buffer);
-
-  // RIFF header
-  writeString(view, 0, 'RIFF');
-  view.setUint32(4, 36 + byteLength, true); // file length
-  writeString(view, 8, 'WAVE');
-  
-  // Format chunk
-  writeString(view, 12, 'fmt ');
-  view.setUint32(16, 16, true); // chunk length
-  view.setUint16(20, 1, true); // PCM format
-  view.setUint16(22, numChannels, true);
-  view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate * numChannels * 2, true); // byte rate
-  view.setUint16(32, numChannels * 2, true); // block align
-  view.setUint16(34, 16, true); // bits per sample
-  
-  // Data chunk
-  writeString(view, 36, 'data');
-  view.setUint32(40, byteLength, true);
-  
-  // Write the PCM data
-  if (pcmData instanceof Int16Array) {
-    const dataView = new Int16Array(buffer, 44);
-    dataView.set(pcmData);
-  } else {
-    const dataView = new Uint8Array(buffer, 44);
-    dataView.set(pcmData);
-  }
-
-  return new Blob([view], { type: 'audio/wav' });
-}
 export default Dashboard;
